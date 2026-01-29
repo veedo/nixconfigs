@@ -4,6 +4,7 @@
     modules = [
       self.nixosModules.cloudNixosConfig
       self.nixosModules.commonNixosConfig
+      self.nixosModules.cloudNixosHardware
     ];
   };
   flake.nixosModules.cloudNixosConfig =
