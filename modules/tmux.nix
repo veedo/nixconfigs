@@ -30,6 +30,9 @@
           set -g @continuum-save-interval '5'
           set -g base-index 1
 
+          # Required to pass ctrl-a to a tmux pane
+          unbind-key C-a
+
           # split panes using | and -
           bind | split-window -h
           bind - split-window -v
