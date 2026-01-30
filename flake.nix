@@ -6,26 +6,9 @@
     nixpkgs-unstable.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     import-tree.url = "github:vic/import-tree";
+    disko.url = "github:nix-community/disko/latest";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
-
-  # outputs =
-  #   {
-  #     self,
-  #     nixpkgs,
-  #     nixpkgs-unstable,
-  #     ...
-  #   }@inputs:
-  #   let
-  #     system = "x86_64-linux";
-  #   in
-  #   {
-  #     packages = import ./pkgs nixpkgs.legacyPackages.${system};
-  #     overlays = import ./overlays { inherit inputs; };
-  #     nixosModules = import ./modules/nixos;
-  #     nixpkgs.config.allowUnfree = true;
-  #     nixosConfigurations.zandernixos = nixpkgs.lib.nixosSystem {
-  #     };
-  #   };
 }

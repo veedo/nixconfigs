@@ -32,6 +32,7 @@
 
           # Required to pass ctrl-a to a tmux pane
           unbind-key C-a
+          bind-key C-a send-prefix
 
           # split panes using | and -
           bind | split-window -h

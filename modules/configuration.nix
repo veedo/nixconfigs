@@ -15,10 +15,6 @@
         self.nixosModules.desktop
         self.nixosModules.zsh
         self.nixosModules.git
-        #./tmux.nix
-        #./desktop.nix
-        #./zsh.nix
-        #./git.nix
       ];
       nix.settings.experimental-features = [
         "nix-command"

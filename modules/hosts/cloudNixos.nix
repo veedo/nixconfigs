@@ -1,10 +1,16 @@
-{ inputs, self, ... }:
+{
+  inputs,
+  self,
+  ...
+}:
 {
   flake.nixosConfigurations.cloudNixos = inputs.nixpkgs.lib.nixosSystem {
     modules = [
       self.nixosModules.cloudNixosConfig
       self.nixosModules.commonNixosConfig
       self.nixosModules.cloudNixosHardware
+      self.nixosModules.cloudDisks
+      inputs.disko.nixosModules.disko
     ];
   };
   flake.nixosModules.cloudNixosConfig =
@@ -49,5 +55,106 @@
 
       #TODO: include tailscale?
       #services.tailscale.enable = true;
+
+    };
+
+  flake.nixosModules.cloudDisks =
+    { config, pkgs, ... }:
+    {
+      disko.devices = {
+        disk = {
+          main = {
+            type = "disk";
+            device = "/dev/sda";
+            content = {
+              type = "gpt";
+              partitions = {
+                ESP = {
+                  size = "1G";
+                  type = "EF00";
+                  content = {
+                    type = "filesystem";
+                    format = "vfat";
+                    mountpoint = "/boot";
+                    mountOptions = [ "umask=0077" ];
+                  };
+                };
+                luks = {
+                  size = "100%";
+                  content = {
+                    type = "luks";
+                    name = "crypted";
+                    extraOpenArgs = [ ];
+                    settings = {
+                      keyFile = "/dev/sdb";
+                      keyFileSize = 4096;
+                      allowDiscards = true;
+                      fallbackToPassword = true;
+                    };
+                    content = {
+                      type = "lvm_pv";
+                      vg = "pool";
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+        lvm_vg = {
+          pool = {
+            type = "lvm_vg";
+            lvs = {
+              var = {
+                size = "32G";
+                content = {
+                  type = "filesystem";
+                  format = "ext4";
+                  mountpoint = "/var";
+                  mountOptions = [
+                    "defaults"
+                    "noexec"
+                    "nodev"
+                    "nosuid"
+                  ];
+                };
+              };
+              tmp = {
+                size = "8G";
+                content = {
+                  type = "filesystem";
+                  format = "ext4";
+                  mountpoint = "/tmp";
+                  mountOptions = [
+                    "defaults"
+                    "noexec"
+                    "nodev"
+                    "nosuid"
+                  ];
+                };
+              };
+              root = {
+                size = "100%";
+                content = {
+                  type = "filesystem";
+                  format = "ext4";
+                  mountpoint = "/";
+                  mountOptions = [
+                    "defaults"
+                  ];
+                };
+              };
+              swap = {
+                size = "32G";
+                content.type = "swap";
+              };
+              raw = {
+                size = "10M";
+              };
+            };
+          };
+        };
+      };
+
     };
 }
