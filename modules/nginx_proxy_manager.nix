@@ -34,6 +34,7 @@
           PGID = "100";
           TZ = "America/Vancouver";
         };
+        autoStart = true;
         # Ensure necessary services like the database are running if using network segmentation
         # networks = [ "your_custom_network" ];
       };
