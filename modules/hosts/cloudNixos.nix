@@ -89,7 +89,7 @@
                     name = "crypted";
                     extraOpenArgs = [ ];
                     settings = {
-                      keyFile = "/dev/sdb";
+                      keyFile = "/dev/disk/by-partlabel/KEYMAIN";
                       keyFileSize = 4096;
                       allowDiscards = true;
                       fallbackToPassword = true;
