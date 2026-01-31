@@ -5,6 +5,8 @@
       self.nixosModules.zanderNixosHardware
       self.nixosModules.zanderNixosConfig
       self.nixosModules.commonNixosConfig
+      self.nixosModules.agenix
+      inputs.agenix.nixosModules.default
     ];
   };
 

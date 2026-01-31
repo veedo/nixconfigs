@@ -11,7 +11,9 @@
       self.nixosModules.cloudNixosHardware
       self.nixosModules.cloudDisks
       inputs.disko.nixosModules.disko
-      self.nixosModules.nginx.proxyManager
+      self.nixosModules.nginx
+      self.nixosModules.agenix
+      inputs.agenix.nixosModules.default
     ];
   };
   flake.nixosModules.cloudNixosConfig =
