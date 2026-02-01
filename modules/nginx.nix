@@ -14,6 +14,8 @@
         443
       ];
 
+      security.acme.acceptTerms = true;
+      security.acme.defaults.email = "veedo.a+acme@gmail.com";
     };
 
 }

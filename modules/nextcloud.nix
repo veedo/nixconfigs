@@ -13,7 +13,7 @@
 
       services.nextcloud = {
         enable = true;
-        hostName = "localhost";
+        hostName = "cloud.erazander.com";
         autoUpdateApps = true;
         maxUploadSize = "1G";
         package = pkgs.nextcloud32;
@@ -27,12 +27,17 @@
         };
       };
 
-      services.nginx.virtualHosts."cloud.erazander.com".listen = [
-        {
-          addr = "127.0.0.1";
-          port = 8081;
-        }
-      ];
+      services.nginx.virtualHosts."cloud.erazander.com" = {
+        listen = [
+          {
+            addr = "127.0.0.1";
+            port = 8081;
+          }
+        ];
+
+        enableACME = true;
+        forceSSL = true;
+      };
 
     };
 }
