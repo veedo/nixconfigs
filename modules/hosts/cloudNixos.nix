@@ -47,10 +47,18 @@
         openresolv
         python3
         ripgrep
+        widevine-cdm
+        (chromium.override { enableWideVine = true; })
       ];
 
       #TODO: determine graphics for server
-      #hardware.graphics.enable = true;
+      hardware.graphics = {
+        enable = true;
+        extraPackages = with pkgs; [
+          intel-media-driver  
+          intel-vaapi-driver  
+        ];
+      };
       #services.xserver.videoDrivers = [ "nvidia" ];
 
       #TODO: determine power management for server
@@ -65,10 +73,9 @@
     { config, pkgs, ... }:
     {
       disko.devices = {
-        disk = {
-          main = {
+        disk.main = {
             type = "disk";
-            device = "/dev/sda";
+            device = "/dev/disk/by-path/pci-0000:00:17.0-ata-2";
             content = {
               type = "gpt";
               partitions = {
@@ -102,7 +109,6 @@
                 };
               };
             };
-          };
         };
         lvm_vg = {
           pool = {
@@ -156,6 +162,40 @@
               };
             };
           };
+        };
+        disk.home = {
+            type = "disk";
+            device = "/dev/disk/by-path/pci-0000:03:00.0-nvme-1";
+            content = {
+              type = "gpt";
+              partitions = {
+                luks = {
+                  size = "100%";
+                  content = {
+                    type = "luks";
+                    name = "cryptedMain";
+                    extraOpenArgs = [ ];
+                    settings = {
+                      keyFile = "/dev/disk/by-partlabel/KEYMAIN";
+                      keyFileSize = 4096;
+                      allowDiscards = true;
+                      fallbackToPassword = true;
+                    };
+                    content = {
+                      type = "filesystem";
+                      format = "ext4";
+                      mountpoint = "/home";
+                      mountOptions = [
+                        "defaults"
+                        "noexec"
+                        "nodev"
+                        "nosuid"
+                      ];
+                    };
+                  };
+                };
+              };
+            };
         };
       };
 
