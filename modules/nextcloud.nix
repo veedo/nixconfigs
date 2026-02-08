@@ -26,14 +26,14 @@
         config = {
           adminuser = "nc_admin";
           dbtype = "mysql";
-          adminpassFile = "/var/lib/nextcloud/admin-pass";
+          adminpassFile = config.age.secrets.cloud_nc_admin.path;
         };
         autoUpdateApps = true;
         maxUploadSize = "1G";
         package = pkgs.nextcloud32;
         https = true;
-        adminpassFile = config.age.secrets.cloud_nc_admin.path;
         caching.redis = true;
+        home = "/clouddata/serverdata";
       };
 
       services.nginx.virtualHosts."cloud.erazander.com" = {
