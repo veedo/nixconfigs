@@ -3,6 +3,9 @@
   flake.nixosModules.nextcloud =
     { config, pkgs, ... }:
     {
+      imports = [
+        self.nixosModules.nginx
+      ];
       environment.systemPackages = with pkgs; [
       ];
 
@@ -21,6 +24,7 @@
         hostName = "cloud.erazander.com";
         database.createLocally = true;
         config = {
+          adminuser = "nc_admin";
           dbtype = "mysql";
           adminpassFile = "/var/lib/nextcloud/admin-pass";
         };
@@ -29,12 +33,6 @@
         package = pkgs.nextcloud32;
         https = true;
         adminpassFile = config.age.secrets.cloud_nc_admin.path;
-        settings = {
-          trusted_domains = [
-            "http://cloud.erazander.com"
-            "https://cloud.erazander.com"
-          ];
-        };
         caching.redis = true;
       };
 
