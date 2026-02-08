@@ -11,9 +11,19 @@
         publicKeys = [ self.agenix.cloud_secrets ];
       };
 
+      services.mysql = {
+        enable = true;
+        package = pkgs.mariadb;
+      };
+
       services.nextcloud = {
         enable = true;
         hostName = "cloud.erazander.com";
+        database.createLocally = true;
+        config = {
+          dbtype = "mysql";
+          adminpassFile = "/var/lib/nextcloud/admin-pass";
+        };
         autoUpdateApps = true;
         maxUploadSize = "1G";
         package = pkgs.nextcloud32;
@@ -25,15 +35,16 @@
             "https://cloud.erazander.com"
           ];
         };
+        caching.redis = true;
       };
 
       services.nginx.virtualHosts."cloud.erazander.com" = {
-        listen = [
-          {
-            addr = "127.0.0.1";
-            port = 8081;
-          }
-        ];
+        #listen = [
+        #  {
+        #    addr = "127.0.0.1";
+        #    port = 8081;
+        #  }
+        #];
 
         enableACME = true;
         forceSSL = true;
