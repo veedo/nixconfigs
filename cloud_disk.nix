@@ -41,6 +41,7 @@
         # Workaround: cannot import 'zclouddata': I/O error in disko tests
         options.cachefile = "none";
         rootFsOptions = {
+          canmount = "on";
           compression = "zstd";
           "com.sun:auto-snapshot" = "false";
         };
@@ -67,6 +68,7 @@
           "encrypted/serverdata" = {
             type = "zfs_fs";
             mountpoint = "/clouddata/serverdata";
+            options.canmount = "on";
             mountOptions = [ "nofail" ];
           };
         };

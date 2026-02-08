@@ -75,14 +75,13 @@
       imports = [
         ../../main_disk.nix
         ../../homedrive.nix
-        #../../cloud_disk.nix
+        ../../cloud_disk.nix
       ];
 
       boot.supportedFilesystems = ["zfs"];
       #boot.zfs.enabled = true;
       boot.zfs.forceImportRoot = false;
-      # TODO: does this cause it to require the pool to even boot?
-      #boot.zfs.extraPools = [ "zclouddata" ];
+      boot.zfs.extraPools = [ "zclouddata" ];
       services.zfs.autoSnapshot.enable = true;
       services.zfs.trim = {
         enable = true;
