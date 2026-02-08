@@ -19,6 +19,12 @@
         package = pkgs.mariadb;
       };
 
+      systemd.tmpfiles.settings."10-nextcloud-directory"."/clouddata/serverdata/nextcloud".d = {
+        group = config.users.users.nextcloud.group;
+        user = config.users.users.nextcloud.name;
+        mode = "0755";
+        age = "-";
+      };
       services.nextcloud = {
         enable = true;
         hostName = "cloud.erazander.com";
@@ -33,7 +39,7 @@
         package = pkgs.nextcloud32;
         https = true;
         caching.redis = true;
-        home = "/clouddata/serverdata";
+        home = "/clouddata/serverdata/nextcloud";
       };
 
       services.nginx.virtualHosts."cloud.erazander.com" = {
