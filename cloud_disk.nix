@@ -7,16 +7,6 @@
         content = {
           type = "gpt";
           partitions = {
-            ESP = {
-              size = "64M";
-              type = "EF00";
-              content = {
-                type = "filesystem";
-                format = "vfat";
-                mountpoint = "/boot";
-                mountOptions = [ "umask=0077" ];
-              };
-            };
             zfs = {
               size = "100%";
               content = {
@@ -55,11 +45,13 @@
           "com.sun:auto-snapshot" = "false";
         };
         mountpoint = "/clouddata";
+        mountOptions = [ "nofail" ];
         postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^zclouddata@blank$' || zfs snapshot zclouddata@blank";
 
         datasets = {
           encrypted = {
             type = "zfs_fs";
+            mountOptions = [ "nofail" ];
             options = {
               mountpoint = "none";
               encryption = "aes-256-gcm";
@@ -75,6 +67,7 @@
           "encrypted/serverdata" = {
             type = "zfs_fs";
             mountpoint = "/clouddata/serverdata";
+            mountOptions = [ "nofail" ];
           };
         };
       };
