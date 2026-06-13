@@ -60,7 +60,7 @@
         # Enable this if you have graphical corruption issues or application crashes after waking
         # up from sleep. This fixes it by saving the entire VRAM memory to /tmp/ instead
         # of just the bare essentials.
-        powerManagement.enable = false;
+        powerManagement.enable = true;
         # Fine-grained power management. Turns off GPU when not in use.
         # Experimental and only works on modern Nvidia GPUs (Turing or newer).
         powerManagement.finegrained = false;
@@ -82,6 +82,8 @@
         dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
         localNetworkGameTransfers.openFirewall = true; # Open ports in the firewall for Steam Local Network Game Transfers
       };
+
+      boot.resumeDevice = "/dev/disk/by-uuid/f93ad37b-1610-47f4-855c-d266e283d424";
 
       powerManagement.enable = true;
       systemd.sleep.extraConfig = ''
