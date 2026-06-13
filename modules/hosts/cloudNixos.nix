@@ -16,6 +16,15 @@
       inputs.agenix.nixosModules.default
     ];
   };
+  flake.nixosConfigurations.installerCloudNixos = inputs.nixpkgs.lib.nixosSystem {
+    modules = [
+      ../../installer.nix
+      "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+    ];
+  };
+  flake.installerCloudNixos =
+    self.nixosConfigurations.installerCloudNixos.config.system.build.isoImage;
+
   flake.nixosModules.cloudNixosConfig =
     { config, pkgs, ... }:
     {
@@ -78,7 +87,7 @@
         ../../cloud_disk.nix
       ];
 
-      boot.supportedFilesystems = ["zfs"];
+      boot.supportedFilesystems = [ "zfs" ];
       #boot.zfs.enabled = true;
       boot.zfs.forceImportRoot = false;
       boot.zfs.extraPools = [ "zclouddata" ];

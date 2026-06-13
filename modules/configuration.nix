@@ -24,7 +24,7 @@
       # Bootloader.
       boot.loader.systemd-boot.enable = true;
       boot.loader.efi.canTouchEfiVariables = true;
-      boot.resumeDevice = config.fileSystems."/".device;
+      #boot.resumeDevice = config.fileSystems."/".device;
 
       networking.networkmanager.enable = true;
 
