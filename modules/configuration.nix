@@ -60,6 +60,7 @@
         keepassxc-go
         lshw
         neovim
+        tree-sitter
         nixfmt-rfc-style
         openresolv
         python3

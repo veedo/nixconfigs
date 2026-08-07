@@ -6,6 +6,7 @@
       self.nixosModules.zanderNixosConfig
       self.nixosModules.commonNixosConfig
       self.nixosModules.agenix
+      self.nixosModules.llama
       inputs.agenix.nixosModules.default
     ];
   };
@@ -33,6 +34,9 @@
 
       programs.appimage.enable = true;
       programs.appimage.binfmt = true;
+
+      boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+      boot.binfmt.preferStaticEmulators = true;
 
       # List packages installed in system profile. To search, run:
       # $ nix search wget
@@ -86,13 +90,13 @@
       boot.resumeDevice = "/dev/disk/by-uuid/f93ad37b-1610-47f4-855c-d266e283d424";
 
       powerManagement.enable = true;
-      systemd.sleep.extraConfig = ''
-        AllowSuspend=yes
-        AllowHibernation=yes
-        AllowHybridSleep=yes
-        AllowSuspendThenHibernate=yes
-        HibernateDelaySec=30m
-      '';
+      systemd.sleep.settings.Sleep = {
+        AllowSuspend = "yes";
+        AllowHibernation = "yes";
+        AllowHybridSleep = "yes";
+        AllowSuspendThenHibernate = "yes";
+        HibernateDelaySec = "30m";
+      };
 
       services.tailscale.enable = true;
     };

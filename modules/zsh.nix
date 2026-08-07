@@ -29,10 +29,12 @@
       environment.shells = with pkgs; [ zsh ];
 
       environment.systemPackages = with pkgs; [
-        fzf
-        fzf-zsh
         zsh-fzf-tab
       ];
+
+      programs.fzf = {
+        fuzzyCompletion = true;
+      };
 
       fonts.packages = with pkgs; [
         cascadia-code
