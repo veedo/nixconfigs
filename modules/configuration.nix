@@ -16,6 +16,7 @@
         self.nixosModules.zsh
         self.nixosModules.git
       ];
+      nix.registry.nixpks.flake = inputs.nixpkgs;
       nix.settings.experimental-features = [
         "nix-command"
         "flakes"

@@ -17,6 +17,7 @@
             # Enable native CPU optimizations (AVX, AVX2, etc.)
             cmakeFlags = (oldAttrs.cmakeFlags or [ ]) ++ [
               "-DGGML_NATIVE=ON"
+              "-DGGML_CUDA_FA_ALL_QUANTS=ON"
               # nixpkgs defaults to every capability CUDA 12.9 supports, which
               # means nine ggml-cuda compile passes. GGML_NATIVE already pins
               # this build to one machine, so target only the RTX 5070's
@@ -32,30 +33,55 @@
 
       # Weights are pulled on first use by llama.cpp's -hf flag and cached here.
       modelCache = "/var/lib/llama-swap/models";
-    in
-    {
-      # perSystem's overlay only reaches flake-parts' pkgs, so expose `unstable`
-      # to the NixOS configuration here as well.
-      nixpkgs.overlays = [
-        (final: prev: {
-          unstable = import inputs.nixpkgs-unstable {
-            inherit (prev.stdenv.hostPlatform) system;
-            config.allowUnfree = true;
-          };
-        })
-      ];
 
-      environment.systemPackages = [
-        llama-cpp
-        pkgs.unstable.llama-swap
-      ];
+      # Context windows, shared by the llama-swap server config and the opencode
+      # client config below so the two cannot drift. llama-server rejects any
+      # request larger than its window with a 400 (exceed_context_size_error),
+      # so the client must be told the same numbers the server was started with.
+      qwenCtx = 98304;
+      gptOssCtx = 65536;
 
-      # Sized for an RTX 5070 (12 GB VRAM) backed by 60 GB of system RAM. Both
-      # models are mixture-of-experts, so the attention/dense tensors live on the
-      # GPU while --n-cpu-moe pushes the bulk of the expert weights into RAM.
-      # llama-swap keeps only one model resident at a time by default, which is
-      # what we want with this little VRAM.
-      environment.etc."llama-swap/config.yaml".text = ''
+      # Tokens reserved for a single response. This is NOT the context window:
+      # opencode subtracts it from the window to decide how much room is left
+      # for input, so window == output would leave no room for a prompt.
+      # models.dev lists 32768 for both of these models.
+      maxOutput = 32768;
+
+      # Kept as its own derivation so the unit below can list it as a
+      # restartTrigger. llama-swap reads this file once at startup and holds it
+      # in memory, and its --watch-config poller cannot detect a rebuild (Nix
+      # normalizes store mtimes to the epoch), so a config change only takes
+      # effect if switch-to-configuration restarts the service.
+      #
+      # Sized for an RTX 5070 (12227 MiB VRAM, of which an idle desktop session
+      # already holds ~1200 MiB) backed by 60 GB of system RAM. Both models are
+      # mixture-of-experts, so the attention/dense tensors live on the GPU while
+      # --n-cpu-moe pushes the bulk of the expert weights into RAM. llama-swap
+      # keeps only one model resident at a time by default, which is what we
+      # want with this little VRAM.
+      #
+      # Measured on this machine (nvidia-smi with the model loaded):
+      #   gpt-oss-20b      --n-cpu-moe 10 -> 10009 MiB used, 1763 MiB free, 69 tok/s
+      #   qwen3-coder-30b  --n-cpu-moe 34 -> 10715 MiB used, 1057 MiB free, 50 tok/s
+      #   qwen3-coder-30b  --n-cpu-moe 38 ->  9266 MiB used, 2506 MiB free, 45 tok/s
+      #
+      # Context sizing for qwen (measured on this box, --flash-attn on):
+      #   KV cache costs 52 KiB/token at q8_0, 27 KiB/token at q4_0.
+      #   Each --n-cpu-moe layer moved off the GPU frees ~398 MiB.
+      #   Fixed GPU cost (weights + compute buffers) is ~4838 MiB at moe 38.
+      #   => usable ctx ~= (VRAM - desktop - headroom - fixed) / per-token cost
+      # The desktop alone floats between 1090 and 1650 MiB depending on what is
+      # open, so budget >=2 GB free rather than filling to the brim. Measured:
+      #   ctx  65536 q8_0 moe 38 ->  9623 used, 2150 free, 51 tok/s
+      #   ctx  81920 q8_0 moe 38 -> 10435 used, 1337 free, 51 tok/s  (too tight)
+      #   ctx  98304 q8_0 moe 42 ->  9871 used, 1901 free, 47 tok/s   <- chosen
+      #   ctx 131072 q4_0 moe 38 ->  9923 used, 1849 free, 51 tok/s   (KV quality
+      #                              drops; q8_0 kept instead since this is the
+      #                              coding model)
+      # ctx 131072 at q8_0 does not fit at any moe setting worth using: it fails
+      # with "failed to allocate buffer for kv cache". The model itself is
+      # trained for 262144, so the ceiling here is VRAM, not the model.
+      swapConfig = pkgs.writeText "llama-swap-config.yaml" ''
         healthCheckTimeout: 1800
         logLevel: info
         startPort: 10001
@@ -75,9 +101,10 @@
             cmd: |
               ''${llama-server}
               -hf unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M
-              --ctx-size 65536
+              --flash-attn on
+              --ctx-size ${toString qwenCtx}
               --n-gpu-layers 99
-              --n-cpu-moe 30
+              --n-cpu-moe 42
               --cache-type-k q8_0
               --cache-type-v q8_0
               --temp 0.7
@@ -96,9 +123,10 @@
             cmd: |
               ''${llama-server}
               -hf ggml-org/gpt-oss-20b-GGUF
-              --ctx-size 65536
+              --flash-attn on
+              --ctx-size ${toString gptOssCtx}
               --n-gpu-layers 99
-              --n-cpu-moe 6
+              --n-cpu-moe 10
               --temp 1.0
               --top-p 1.0
               --top-k 0
@@ -107,6 +135,63 @@
               - thinker
             ttl: 600
       '';
+
+      # opencode's client-side view of the same two models. Lives here rather
+      # than in its own module so it shares the ctx values above; the numbers
+      # have to agree with what llama-server was started with.
+      opencodeConfig = (pkgs.formats.json { }).generate "opencode.json" {
+        "$schema" = "https://opencode.ai/config.json";
+        provider."llama.cpp" = {
+          npm = "@ai-sdk/openai-compatible";
+          name = "llama-server (local)";
+          options.baseURL = "http://127.0.0.1:9292/v1";
+          models = {
+            qwen3-coder-30b = {
+              name = "Qwen3-Coder: a3b-30b (local)";
+              limit = {
+                context = qwenCtx;
+                output = maxOutput;
+              };
+            };
+            gpt-oss-20b = {
+              name = "GPT-oss: 20b (local)";
+              limit = {
+                context = gptOssCtx;
+                output = maxOutput;
+              };
+            };
+          };
+        };
+      };
+    in
+    {
+      # perSystem's overlay only reaches flake-parts' pkgs, so expose `unstable`
+      # to the NixOS configuration here as well.
+      nixpkgs.overlays = [
+        (final: prev: {
+          unstable = import inputs.nixpkgs-unstable {
+            inherit (prev.stdenv.hostPlatform) system;
+            config.allowUnfree = true;
+          };
+        })
+      ];
+
+      environment.systemPackages = [
+        llama-cpp
+        pkgs.unstable.llama-swap
+      ];
+
+      environment.etc."llama-swap/config.yaml".source = swapConfig;
+
+      # No home-manager in this flake, so link the generated opencode config into
+      # place with tmpfiles (re-applied on every switch). "L+" replaces whatever
+      # is already at that path. Only opencode.json is managed -- opencode also
+      # keeps node_modules/, package.json and skills/ in that directory and
+      # rewrites them itself, so the directory as a whole must stay writable.
+      systemd.tmpfiles.rules = [
+        "d /home/zandere/.config/opencode 0755 zandere users -"
+        "L+ /home/zandere/.config/opencode/opencode.json - - - - ${opencodeConfig}"
+      ];
 
       # Reachable over the tailnet only -- deliberately not in the global
       # allowedTCPPorts, since the API is unauthenticated.
@@ -117,6 +202,10 @@
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
+
+        # Pick up model/flag changes on nixos-rebuild switch. Without this the
+        # daemon keeps serving the config it started with.
+        restartTriggers = [ swapConfig ];
 
         serviceConfig = {
           Type = "simple";

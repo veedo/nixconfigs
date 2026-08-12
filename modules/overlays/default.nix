@@ -21,5 +21,8 @@
           })
         ];
       };
+
+      # Expose the overlaid pkgs set so `nix run .#unstable.<pkg>` works.
+      legacyPackages = pkgs;
     };
 }
