@@ -22,7 +22,7 @@ This is a NixOS system configuration repository that manages multiple NixOS host
 │   ├── desktop.nix        # Desktop environment settings (Hyprland, Waybar)
 │   ├── hosts/             # Host-specific configurations
 │   │   ├── cloudNixos.nix  # Cloud server configuration
-│   │   └── zanderNixos.nix # Personal laptop/desktop configuration
+│   │   └── zanderNixos.nix # Personal desktop configuration
 │   ├── git.nix            # Git configuration
 │   ├── llama.nix          # Llama.cpp model serving
 │   ├── mailserver.nix     # Mail server configuration
@@ -38,7 +38,7 @@ This is a NixOS system configuration repository that manages multiple NixOS host
 
 ### Host Configurations
 - `cloudNixos`: Cloud server running NixOS with ZFS storage
-- `zanderNixos`: Personal laptop/desktop with NVIDIA graphics
+- `zanderNixos`: Personal desktop with NVIDIA graphics
 
 ### NixOS Modules
 - `commonNixosConfig`: Shared configuration for all hosts
@@ -60,7 +60,7 @@ nixos-rebuild switch --flake .#cloudNixos
 # Build the zanderNixos configuration
 nix build .#nixosConfigurations.zanderNixos.config.system.build.toplevel
 
-# Deploy to zander laptop
+# Deploy to zander desktop
 nixos-rebuild switch --flake .#zanderNixos
 ```
 
@@ -140,9 +140,9 @@ nix build .#nixosConfigurations.cloudNixos.config.system.build.toplevel
 
 ## Important Notes
 
-1. This repository is designed for specific hardware configurations (cloud server vs. personal laptop)
+1. This repository is designed for specific hardware configurations (cloud server vs. personal desktop)
 2. Secrets are encrypted and require proper key management
 3. The system uses both stable and unstable Nixpkgs channels
 4. ZFS is used on the cloud server with automatic maintenance features enabled
 5. Both hosts use different desktop environments and software stacks due to hardware differences
-6. The local machine where this repository is being developed is configured as `zanderNixos` (personal laptop/desktop)
+6. The local machine where this repository is being developed is configured as `zanderNixos` (personal desktop)
