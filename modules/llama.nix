@@ -168,6 +168,18 @@
       crushConfig = pkgs.writeText "crushrc" ''
         export CRUSH_DISABLE_METRICS=1
 
+        # Auto-approve read-only tools and file editing tools in the same repo
+        hook add --name "auto-approve-read-only-tools" \
+          --event tool_call \
+          --condition 'tool.name in ["read_file", "view", "ls", "grep", "find", "cat", "head", "tail", "which"]' \
+          --action 'approve'
+
+        # Auto-approve file editing tools
+        hook add --name "auto-approve-file-editing-tools" \
+          --event tool_call \
+          --condition 'tool.name in ["edit_file", "write_file", "create_file", "delete_file", "rename_file"]' \
+          --action 'approve'
+
         provider add llamacpp \
           --name "llama.cpp" \
           --type llamacpp \
@@ -178,6 +190,51 @@
           --name "Qwen3-Coder: a3b-30b (local)" \
           --context-window ${toString qwenCtx} \
           --default-max-tokens ${toString maxOutput}
+
+        # LSPs for various languages using nix execution
+        lsp add go \
+          --name "gopls" \
+          --command "${pkgs.unstable.go}/bin/gopls" \
+          --args "serve" \
+          --language-id "go"
+
+        lsp add python \
+          --name "pylsp" \
+          --command "${pkgs.unstable.python3Packages.pylsp}/bin/pylsp" \
+          --language-id "python"
+
+        lsp add nix \
+          --name "nil" \
+          --command "${pkgs.unstable.nil}/bin/nil" \
+          --language-id "nix"
+
+        lsp add rust \
+          --name "rust-analyzer" \
+          --command "${pkgs.unstable.rust-analyzer}/bin/rust-analyzer" \
+          --language-id "rust"
+
+        lsp add html \
+          --name "html-language-server" \
+          --command "${pkgs.unstable.nodePackages.html-language-server}/bin/html-language-server" \
+          --args "--stdio" \
+          --language-id "html"
+
+        lsp add javascript \
+          --name "typescript-language-server" \
+          --command "${pkgs.unstable.nodePackages.typescript-language-server}/bin/typescript-language-server" \
+          --args "--stdio" \
+          --language-id "javascript"
+
+        lsp add typescript \
+          --name "typescript-language-server" \
+          --command "${pkgs.unstable.nodePackages.typescript-language-server}/bin/typescript-language-server" \
+          --args "--stdio" \
+          --language-id "typescript"
+
+        lsp add elixir \
+          --name "elixir-ls" \
+          --command "${pkgs.unstable.elixir-ls}/bin/elixir-ls" \
+          --language-id "elixir"
       '';
     in
     {
