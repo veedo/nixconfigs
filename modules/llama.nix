@@ -163,6 +163,22 @@
           };
         };
       };
+
+      # Crush configuration for local llama.cpp models
+      crushConfig = pkgs.writeText "crushrc" ''
+        export CRUSH_DISABLE_METRICS=1
+
+        provider add llamacpp \
+          --name "llama.cpp" \
+          --type llamacpp \
+          --base-url "http://localhost:9292/v1" \
+          --discover-models true
+
+        model add llamacpp/qwen3-coder-30b \
+          --name "Qwen3-Coder: a3b-30b (local)" \
+          --context-window ${toString qwenCtx} \
+          --default-max-tokens ${toString maxOutput}
+      '';
     in
     {
       # perSystem's overlay only reaches flake-parts' pkgs, so expose `unstable`
@@ -191,6 +207,8 @@
       systemd.tmpfiles.rules = [
         "d /home/zandere/.config/opencode 0755 zandere users -"
         "L+ /home/zandere/.config/opencode/opencode.json - - - - ${opencodeConfig}"
+        "d /home/zandere/.config/crush 0755 zandere users -"
+        "L+ /home/zandere/.config/crush/crushrc - - - - ${crushConfig}"
       ];
 
       # Reachable over the tailnet only -- deliberately not in the global
