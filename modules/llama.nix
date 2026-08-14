@@ -1,7 +1,7 @@
 { inputs, self, ... }:
 {
   flake.nixosModules.llama =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     let
       # Native-optimized CUDA build of llama.cpp, shared between the system
       # profile and the llama-swap config below.
@@ -44,8 +44,8 @@
       # that is what is configured here. The architecture would allow far more
       # (trained for 262144, and its KV cache is cheap -- see below), so this is
       # a deliberate "use the suggested value" choice, not a VRAM limit.
-      qwen36Ctx = 65536;
-      qwen36ReasoningBudget = qwen36Ctx / 4;
+      qwen36Ctx = 81920;
+      qwen36ReasoningBudget = 10240;
 
       # Tokens reserved for a single response. This is NOT the context window:
       # opencode subtracts it from the window to decide how much room is left
@@ -57,7 +57,7 @@
       # 32768 for output -- that would leave zero room for the prompt. Half the
       # window still comfortably covers the model's 8192-token thinking budget
       # plus a long answer.
-      qwen36Output = 16384;
+      qwen36Output = qwen36Ctx / 2;
 
       # Kept as its own derivation so the unit below can list it as a
       # restartTrigger. llama-swap reads this file once at startup and holds it
@@ -254,6 +254,164 @@
         };
       };
 
+      # Language servers for crush. These are launched with `nix shell` against
+      # this flake's pinned nixpkgs-unstable rather than interpolated as bare
+      # store paths. Interpolating a store path makes the server a runtime
+      # dependency of crushrc, and therefore of the system closure -- so every
+      # nixos-rebuild fetches the Go toolchain, rust-analyzer, Elixir/OTP and
+      # node whether or not a single .go or .ex file is ever opened. `nix shell`
+      # resolves the same derivation lazily on first use and lets the GC reclaim
+      # it afterwards. Evaluation is still pinned to flake.lock, so this is no
+      # less reproducible, and nix's eval cache keeps warm startup around 50 ms,
+      # which is noise next to LSP initialization itself. The trade is that the
+      # first launch of a server has to build or substitute it, so it needs
+      # network access the first time.
+      #
+      # `nix shell ... --command <bin>` rather than `nix run`, for two reasons:
+      # vscode-langservers-extracted ships four servers and sets no mainProgram,
+      # so `nix run` cannot pick one; and --command swallows the remaining
+      # arguments, so server flags like --stdio need no `--` separator.
+      #
+      # filetypes/rootMarkers keep a server from being started outside the kind
+      # of project it understands. Without rootMarkers, rust-analyzer starts in
+      # every repo and logs "failed to fetch workspace" wherever there is no
+      # Cargo.toml.
+      lspServers = {
+        go = {
+          attr = "gopls";
+          bin = "gopls";
+          # gopls does not live in the `go` derivation -- referencing
+          # ${pkgs.go}/bin/gopls is what produced the original
+          # "fork/exec ...: no such file or directory".
+          filetypes = [
+            "go"
+            "gomod"
+            "gowork"
+            "gotmpl"
+          ];
+          rootMarkers = [
+            "go.mod"
+            "go.work"
+          ];
+        };
+
+        # Deliberately not named "python" (nor "pylsp"/"python3"): crush drops an
+        # `lsp add` entry under any of those names without logging anything, so
+        # the entry this replaces never actually started. The name is only a
+        # label -- filetypes below are what bind it to .py files.
+        pythonls = {
+          attr = "python3Packages.python-lsp-server";
+          bin = "pylsp";
+          filetypes = [ "python" ];
+        };
+
+        nix = {
+          attr = "nil";
+          bin = "nil";
+          filetypes = [ "nix" ];
+        };
+
+        rust = {
+          attr = "rust-analyzer";
+          bin = "rust-analyzer";
+          filetypes = [ "rust" ];
+          rootMarkers = [ "Cargo.toml" ];
+        };
+
+        css = {
+          attr = "vscode-langservers-extracted";
+          bin = "vscode-css-language-server";
+          args = [ "--stdio" ];
+          filetypes = [
+            "css"
+            "scss"
+            "less"
+          ];
+        };
+
+        json = {
+          attr = "vscode-langservers-extracted";
+          bin = "vscode-json-language-server";
+          args = [ "--stdio" ];
+          filetypes = [
+            "json"
+            "jsonc"
+          ];
+        };
+
+        # Not vscode-html-language-server: it advertises an LSP 3.18
+        # workspace/textDocumentContent capability that crush's LSP client
+        # cannot decode, and the handshake dies with "unmarshal failed to match
+        # one of [TextDocumentContentOptions TextDocumentContentRegistrationOptions]".
+        # Its css and json siblings above are unaffected.
+        html = {
+          attr = "superhtml";
+          bin = "superhtml";
+          args = [ "lsp" ];
+          filetypes = [ "html" ];
+        };
+
+        # One server for both languages -- typescript-language-server handles
+        # JavaScript too, and a second copy would just be another tsserver
+        # process holding a duplicate program graph in memory.
+        typescript = {
+          attr = "typescript-language-server";
+          bin = "typescript-language-server";
+          args = [ "--stdio" ];
+          filetypes = [
+            "typescript"
+            "typescriptreact"
+            "javascript"
+            "javascriptreact"
+          ];
+        };
+
+        # nixpkgs' elixir-ls is a launcher script that runs Mix.install at
+        # startup to build itself, which needs a working Hex install and fails
+        # closed here ("Could not start Hex", then the LSP handshake times out).
+        # expert is the successor upstream now points lexical and next-ls at,
+        # and it ships as a real binary.
+        elixir = {
+          attr = "beamPackages.expert";
+          bin = "expert";
+          args = [ "--stdio" ];
+          filetypes = [
+            "elixir"
+            "eelixir"
+            "heex"
+            "surface"
+          ];
+          rootMarkers = [ "mix.exs" ];
+        };
+      };
+
+      # crushrc is a bash script, so this renders each server as an `lsp add`
+      # call. Uses the system profile's nix rather than ${pkgs.nix} so the
+      # client always matches the daemon the user's own shell talks to.
+      renderLsp =
+        name: srv:
+        let
+          shellArgs = [
+            "shell"
+            "--quiet"
+            "${inputs.nixpkgs-unstable}#${srv.attr}"
+            "--command"
+            srv.bin
+          ]
+          ++ srv.args or [ ];
+          line = flag: values: lib.concatMapStringsSep " " (v: ''--${flag} "${v}"'') values;
+          lines = [
+            ''--command "/run/current-system/sw/bin/nix"''
+            (line "args" shellArgs)
+          ]
+          ++ lib.optional (srv.filetypes or [ ] != [ ]) (line "filetypes" srv.filetypes)
+          ++ lib.optional (srv.rootMarkers or [ ] != [ ]) (line "root-markers" srv.rootMarkers);
+        in
+        ''
+          lsp add ${name} \
+            ${lib.concatStringsSep " \\\n  " lines}
+        '';
+
       # Crush configuration for local llama.cpp models
       crushConfig = pkgs.writeText "crushrc" ''
         export CRUSH_DISABLE_METRICS=1
@@ -262,6 +420,8 @@
           view ls grep glob sourcegraph \
           edit write multiedit \
           fetch agentic_fetch
+
+        hook add PreToolUse --matcher "^bash$" --command "/usr/bin/rtk-rewrite"
 
         provider add llamacpp \
           --name "llama.cpp" \
@@ -279,41 +439,8 @@
           --context-window ${toString qwen36Ctx} \
           --default-max-tokens ${toString qwen36Output}
 
-        # LSPs for various languages using nix execution
-        lsp add go \
-          --command "${pkgs.unstable.go}/bin/gopls"
-
-        lsp add python \
-          --command "${pkgs.unstable.python3Packages.python-lsp-server}/bin/pylsp"
-
-        lsp add nix \
-          --command "${pkgs.unstable.nil}/bin/nil"
-
-        lsp add rust \
-          --command "${pkgs.unstable.rust-analyzer}/bin/rust-analyzer"
-
-        lsp add css \
-          --command "${pkgs.unstable.vscode-langservers-extracted}/bin/vscode-css-language-server" \
-          --args "--stdio"
-
-        lsp add json \
-          --command "${pkgs.unstable.vscode-langservers-extracted}/bin/vscode-json-language-server" \
-          --args "--stdio"
-
-        lsp add html \
-          --command "${pkgs.unstable.vscode-langservers-extracted}/bin/vscode-html-language-server" \
-          --args "--stdio"
-
-        lsp add javascript \
-          --command "${pkgs.unstable.typescript-language-server}/bin/typescript-language-server" \
-          --args "--stdio"
-
-        lsp add typescript \
-          --command "${pkgs.unstable.typescript-language-server}/bin/typescript-language-server" \
-          --args "--stdio"
-
-        lsp add elixir \
-          --command "${pkgs.unstable.elixir-ls}/bin/elixir-ls"
+        # LSPs for various languages, fetched on demand via nix (see lspServers).
+        ${lib.concatStringsSep "\n" (lib.mapAttrsToList renderLsp lspServers)}
       '';
     in
     {
