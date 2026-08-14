@@ -40,12 +40,24 @@
       # so the client must be told the same numbers the server was started with.
       qwenCtx = 98304;
       gptOssCtx = 65536;
+      # Qwen3.6-27B-A3B-Coder: the model card's suggested context is 32768, and
+      # that is what is configured here. The architecture would allow far more
+      # (trained for 262144, and its KV cache is cheap -- see below), so this is
+      # a deliberate "use the suggested value" choice, not a VRAM limit.
+      qwen36Ctx = 65536;
+      qwen36ReasoningBudget = qwen36Ctx / 4;
 
       # Tokens reserved for a single response. This is NOT the context window:
       # opencode subtracts it from the window to decide how much room is left
       # for input, so window == output would leave no room for a prompt.
       # models.dev lists 32768 for both of these models.
       maxOutput = 32768;
+
+      # qwen3.6-27b's whole window is only 32768, so it cannot reserve the same
+      # 32768 for output -- that would leave zero room for the prompt. Half the
+      # window still comfortably covers the model's 8192-token thinking budget
+      # plus a long answer.
+      qwen36Output = 16384;
 
       # Kept as its own derivation so the unit below can list it as a
       # restartTrigger. llama-swap reads this file once at startup and holds it
@@ -81,6 +93,46 @@
       # ctx 131072 at q8_0 does not fit at any moe setting worth using: it fails
       # with "failed to allocate buffer for kv cache". The model itself is
       # trained for 262144, so the ceiling here is VRAM, not the model.
+      #
+      # Sizing for qwen3.6-27b-coder is a different problem, because it is a
+      # *hybrid* model (arch qwen35moe: 40 layers, but only every 4th is full
+      # attention -- 10 attention layers and 30 gated-linear-attention layers).
+      # Linear-attention layers carry a fixed-size recurrent state instead of a
+      # growing KV cache, so context is nearly free here:
+      #   KV = 10 layers * 2 kv-heads * 256 head-dim * 2 (K+V) = 10240 elem/token
+      #      = 20 KiB/token at f16, i.e. 640 MiB for the whole 32768 window.
+      #   Recurrent state adds a constant ~64 MiB regardless of context.
+      # Compare qwen3-coder-30b's 52 KiB/token: this model's window costs about
+      # 2.5% of what the same window would cost there. So --cache-type-k/v are
+      # deliberately left at f16 -- quantizing would save ~300 MiB and cost
+      # quality on the model we care most about being accurate.
+      #
+      # That makes *weights*, not KV, the binding constraint. CD-IQ4_K_M is
+      # ~15.9 GiB, and each --n-cpu-moe layer moves one layer's 184 experts to
+      # RAM. Measured on this machine (nvidia-smi during a 300-token
+      # generation, desktop sitting at ~1.1-1.2 GiB):
+      #   moe 22 -> 11509 used,  263 free            (will not survive the
+      #                                               desktop growing -- unusable)
+      #   moe 28 ->  9593 used, 2179 free, 70 tok/s
+      #   moe 29 ->  9261 used, 2511 free, 76 tok/s   <- chosen
+      # The slope between those points is ~332 MiB freed per layer, so the fixed
+      # cost (non-expert weights + KV + CUDA compute buffers) is ~4.3 GiB --
+      # noticeably heavier than qwen3-coder-30b's ~4.8 GiB at moe 38 relative to
+      # how few experts stay resident. 28 measuring *slower* than 29 is
+      # draft-acceptance noise (67% vs 79% below), not layer placement; the two
+      # are the same speed within run-to-run variance, so 29 is free margin.
+      # Range is 0-40, one per layer. Raise it if this ever OOMs.
+      #
+      # MTP: this repo ships the model's native multi-token-prediction head, so
+      # --spec-type draft-mtp gives speculative decoding without a second draft
+      # model. It pays off especially well here -- verifying several drafted
+      # tokens in one batch amortises the expensive CPU-side expert matmuls that
+      # --n-cpu-moe creates. --spec-draft-n-max 3 is the A3B recommendation.
+      # Both flags need llama.cpp >= b9180; the pinned build is 10273. Measured
+      # draft acceptance on real coding output is 67-79%, and llama-server
+      # reports it per request as draft_n / draft_n_accepted in `timings` --
+      # worth re-checking there rather than watching prompt-processing rate,
+      # which MTP does not help.
       swapConfig = pkgs.writeText "llama-swap-config.yaml" ''
         healthCheckTimeout: 1800
         logLevel: info
@@ -113,6 +165,37 @@
               --repeat-penalty 1.05
             aliases:
               - coder
+            ttl: 600
+
+          # Coding / agentic work, newer generation. Qwen3.6-35B-A3B with its
+          # expert count pruned 256 -> 184, so ~26B total and still ~3B active.
+          # Hybrid attention (see the sizing notes above) and a native MTP head
+          # for speculative decoding. CD-IQ4_K_M is the card's recommended quant
+          # ("full-precision-parity code quality at the smallest at-parity
+          # size"); the IQ2_M/IQ3_M quants are the ones to avoid on Blackwell.
+          # Sampling and the 8192-token thinking budget are the card's suggested
+          # values. Top-10 expert routing is baked into these weights; append
+          #   --override-kv qwen35moe.expert_used_count=int:8
+          # to trade a little quality for faster CPU-side expert passes.
+          qwen36-coder-27b:
+            cmd: |
+              ''${llama-server}
+              -hf ManniX-ITA/Qwen3.6-27B-A3B-Coder-MTP-GGUF:CD-IQ4_K_M
+              --no-mmproj
+              --flash-attn auto
+              --ctx-size ${toString qwen36Ctx}
+              --n-gpu-layers 99
+              --n-cpu-moe 29
+              --spec-type draft-mtp
+              --spec-draft-n-max 3
+              --reasoning-budget ${toString qwen36ReasoningBudget}
+              --reasoning-budget-message "OK, I have enough to answer now."
+              --temp 0.6
+              --top-p 0.95
+              --top-k 20
+            aliases:
+              - qwen36
+              - coder36
             ttl: 600
 
           # Reasoning / debugging. MXFP4 weights (~11 GB) with a small expert
@@ -153,6 +236,13 @@
                 output = maxOutput;
               };
             };
+            qwen36-coder-27b = {
+              name = "Qwen3.6-Coder: a3b-27b (local)";
+              limit = {
+                context = qwen36Ctx;
+                output = qwen36Output;
+              };
+            };
             gpt-oss-20b = {
               name = "GPT-oss: 20b (local)";
               limit = {
@@ -168,17 +258,10 @@
       crushConfig = pkgs.writeText "crushrc" ''
         export CRUSH_DISABLE_METRICS=1
 
-        # Auto-approve read-only tools and file editing tools in the same repo
-        hook add --name "auto-approve-read-only-tools" \
-          --event tool_call \
-          --condition 'tool.name in ["read_file", "view", "ls", "grep", "find", "cat", "head", "tail", "which"]' \
-          --action 'approve'
-
-        # Auto-approve file editing tools
-        hook add --name "auto-approve-file-editing-tools" \
-          --event tool_call \
-          --condition 'tool.name in ["edit_file", "write_file", "create_file", "delete_file", "rename_file"]' \
-          --action 'approve'
+        permissions allow \
+          view ls grep glob sourcegraph \
+          edit write multiedit \
+          fetch agentic_fetch
 
         provider add llamacpp \
           --name "llama.cpp" \
@@ -191,50 +274,46 @@
           --context-window ${toString qwenCtx} \
           --default-max-tokens ${toString maxOutput}
 
+        model add llamacpp/qwen36-coder-27b \
+          --name "Qwen3.6-Coder: a3b-27b (local)" \
+          --context-window ${toString qwen36Ctx} \
+          --default-max-tokens ${toString qwen36Output}
+
         # LSPs for various languages using nix execution
         lsp add go \
-          --name "gopls" \
-          --command "${pkgs.unstable.go}/bin/gopls" \
-          --args "serve" \
-          --language-id "go"
+          --command "${pkgs.unstable.go}/bin/gopls"
 
         lsp add python \
-          --name "pylsp" \
-          --command "${pkgs.unstable.python3Packages.pylsp}/bin/pylsp" \
-          --language-id "python"
+          --command "${pkgs.unstable.python3Packages.python-lsp-server}/bin/pylsp"
 
         lsp add nix \
-          --name "nil" \
-          --command "${pkgs.unstable.nil}/bin/nil" \
-          --language-id "nix"
+          --command "${pkgs.unstable.nil}/bin/nil"
 
         lsp add rust \
-          --name "rust-analyzer" \
-          --command "${pkgs.unstable.rust-analyzer}/bin/rust-analyzer" \
-          --language-id "rust"
+          --command "${pkgs.unstable.rust-analyzer}/bin/rust-analyzer"
+
+        lsp add css \
+          --command "${pkgs.unstable.vscode-langservers-extracted}/bin/vscode-css-language-server" \
+          --args "--stdio"
+
+        lsp add json \
+          --command "${pkgs.unstable.vscode-langservers-extracted}/bin/vscode-json-language-server" \
+          --args "--stdio"
 
         lsp add html \
-          --name "html-language-server" \
-          --command "${pkgs.unstable.nodePackages.html-language-server}/bin/html-language-server" \
-          --args "--stdio" \
-          --language-id "html"
+          --command "${pkgs.unstable.vscode-langservers-extracted}/bin/vscode-html-language-server" \
+          --args "--stdio"
 
         lsp add javascript \
-          --name "typescript-language-server" \
-          --command "${pkgs.unstable.nodePackages.typescript-language-server}/bin/typescript-language-server" \
-          --args "--stdio" \
-          --language-id "javascript"
+          --command "${pkgs.unstable.typescript-language-server}/bin/typescript-language-server" \
+          --args "--stdio"
 
         lsp add typescript \
-          --name "typescript-language-server" \
-          --command "${pkgs.unstable.nodePackages.typescript-language-server}/bin/typescript-language-server" \
-          --args "--stdio" \
-          --language-id "typescript"
+          --command "${pkgs.unstable.typescript-language-server}/bin/typescript-language-server" \
+          --args "--stdio"
 
         lsp add elixir \
-          --name "elixir-ls" \
-          --command "${pkgs.unstable.elixir-ls}/bin/elixir-ls" \
-          --language-id "elixir"
+          --command "${pkgs.unstable.elixir-ls}/bin/elixir-ls"
       '';
     in
     {
