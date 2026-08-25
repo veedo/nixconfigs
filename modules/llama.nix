@@ -439,6 +439,26 @@
           --context-window ${toString qwen36Ctx} \
           --default-max-tokens ${toString qwen36Output}
 
+        provider add spark \
+          --name "DGX Spark" \
+          --type openai-compat \
+          --base-url "http://spark-b614.hummingbird-opaleye.ts.net:8002/v1" \
+          --api-key "none"
+
+        model add spark/unsloth/qwen3.8-27b-nvfp4 \
+          --name "qwen3.8 27b nvfp4" \
+          --context-window 262144 \
+          --default-max-tokens 32768 \
+          --can-reason false \
+          --supports-images false \
+          --price-input 0 \
+          --price-output 0 \
+          --price-cache-create 0 \
+          --price-cache-hit 0
+
+        model large spark/unsloth/qwen3.8-27b-nvfp4
+        model small llamacpp/qwen36-coder-27b
+
         # LSPs for various languages, fetched on demand via nix (see lspServers).
         ${lib.concatStringsSep "\n" (lib.mapAttrsToList renderLsp lspServers)}
       '';
