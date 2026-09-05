@@ -456,8 +456,49 @@
           --price-cache-create 0 \
           --price-cache-hit 0
 
-        model large spark/unsloth/qwen3.8-27b-nvfp4
+        # DeepSeek-V4-Flash on the same Spark box as the provider above, but a
+        # separate server on :8000, so it needs its own provider entry. Reached
+        # over the tailnet name rather than localhost, matching `spark`.
+        # discover-models is off because the endpoint's /v1/models listing does
+        # not carry context/pricing metadata, so the model is declared below.
+        provider add spark-deepseek \
+          --name "DeepSeek-V4-Flash (DGX Spark)" \
+          --type openai-compat \
+          --base-url "http://spark-b614.hummingbird-opaleye.ts.net:8000/v1" \
+          --api-key "sparkrun-local" \
+          --discover-models false
+
+        model add spark-deepseek/deepseek-ai/DeepSeek-V4-Flash \
+          --name "DeepSeek-V4-Flash" \
+          --context-window 256000 \
+          --default-max-tokens 32768 \
+          --can-reason true \
+          --reasoning-effort medium \
+          --supports-images false \
+          --price-input 0 \
+          --price-output 0 \
+          --price-cache-create 0 \
+          --price-cache-hit 0
+
+        model large spark-deepseek/deepseek-ai/DeepSeek-V4-Flash \
+          --max-tokens 32768 \
+          --temperature 0.6 \
+          --top-p 0.95
+
+        # Summarization stays on the local model -- deliberately not the
+        # DeepSeek small slot the imported JSON asked for. Sampling is left
+        # bare here because llama-swap already starts qwen36 with the card's
+        # recommended temp/top-p/top-k.
         model small llamacpp/qwen36-coder-27b
+        model small spark-deepseek/deepseek-ai/DeepSeek-V4-Flash \
+          --max-tokens 4096 \
+          --temperature 0.3 \
+          --top-p 0.95
+
+        # `disable_provider_auto_update: true` -- the option key is phrased
+        # positively in crushrc and stored negated.
+        option provider-auto-update false
+        option attribution-trailer-style none
 
         # LSPs for various languages, fetched on demand via nix (see lspServers).
         ${lib.concatStringsSep "\n" (lib.mapAttrsToList renderLsp lspServers)}

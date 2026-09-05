@@ -29,6 +29,7 @@
           set -g @continuum-restore 'on'
           set -g @continuum-save-interval '5'
           set -g base-index 1
+          set -g extended-keys on
 
           # Required to pass ctrl-a to a tmux pane
           unbind-key C-a
