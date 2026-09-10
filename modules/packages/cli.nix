@@ -16,6 +16,7 @@
       fastfetch
       ncdu
       qemu
+      zsh-nix-shell
     ];
 
     programs.neovim = {
@@ -27,8 +28,10 @@
     };
     programs.yazi.enable = true;
     programs.nh.enable = true;
-    programs.starship.enable = true;
-    programs.zoxide.enable = true;
+    programs.starship = {
+      enable = true;
+      enableZshIntegration = true;
+    };
 
     programs.zsh = {
       enable = true;
@@ -38,14 +41,21 @@
       syntaxHighlighting.enable = true;
       # Provides enhanced tab-completion for tools like git, systemd, etc.
       enableBashCompletion = true;
-      enableFzfCompletion = true;
       enableFzfGit = true;
       enableFzfHistory = true;
 
       interactiveShellInit = ''
-        eval "$(zoxide init zsh)"
         source ${pkgs.zsh-nix-shell}/share/zsh-nix-shell/nix-shell.plugin.zsh
       '';
+    };
+
+    programs.fzf = {
+      enable = true;
+      enableZshIntegration = true;
+    };
+    programs.zoxide = {
+      enable = true;
+      enableZshIntegration = true;
     };
 
     programs.git = {
