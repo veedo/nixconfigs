@@ -25,6 +25,9 @@
           "podman"
         ];
       };
+      networking.extraHosts = ''
+                127.0.0.1 hugh.local
+      '';
 
       # Enable automatic login for the user.
       services.getty.autologinUser = "zandere";
