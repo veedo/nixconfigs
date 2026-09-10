@@ -94,11 +94,11 @@
     "kickstart-modular-nvim": {
       "flake": false,
       "locked": {
-        "lastModified": 1789074449,
-        "narHash": "sha256-9JoDRN8ZpNtR2Pm1OTthDn1/WFxubItyV9iOUIBw7EI=",
+        "lastModified": 1789077694,
+        "narHash": "sha256-PB6nYuTrGv6dNmuJWtcFJYClsuqkkgalSXWG/NPGRcA=",
         "owner": "veedo",
         "repo": "kickstart-modular.nvim",
-        "rev": "1a28ac1af2da13545770d6e1186b5229690f158c",
+        "rev": "6ab8ccb9f940770822c0ce8777cf1be8f686e710",
         "type": "github"
       },
       "original": {

@@ -30,6 +30,7 @@
     pluginNames = [
       "guess-indent-nvim"
       "gitsigns-nvim"
+      "vim-fugitive"
       "which-key-nvim"
       "tokyonight-nvim"
       "todo-comments-nvim"
