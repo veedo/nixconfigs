@@ -269,7 +269,7 @@ hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + SUPER_L", hl.dsp.exec_cmd(menu))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
-hl.bind(mainMod .. " + |", hl.dsp.layout("togglesplit"))    -- dwindle only
+hl.bind(mainMod .. " + bar", hl.dsp.layout("togglesplit"))    -- dwindle only
 hl.bind(mainMod .. " + M", hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }))
 hl.bind(mainMod .. " + SHIFT + M", hl.dsp.window.fullscreen({ action = "toggle" }))
 hl.bind("Print", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | swappy -f -"))
@@ -318,9 +318,9 @@ hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = tr
 hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
 
-hl.bind(mainMod + " + SHIFT + S", hl.dsp.group.toggle())
-hl.bind(mainMod + " + S", hl.dsp.group.next())
-hl.bind(mainMod + " + ALT + S", hl.dsp.window.move({ out_of_group = "right" }))
+hl.bind(mainMod .. " + SHIFT + S", hl.dsp.group.toggle())
+hl.bind(mainMod .. " + S", hl.dsp.group.next())
+hl.bind(mainMod .. " + ALT + S", hl.dsp.window.move({ out_of_group = "right" }))
 
 
 
