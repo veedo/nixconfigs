@@ -2,7 +2,10 @@
   flake.nixosModules.core = { pkgs, ... }: {
 
     nixpkgs.config.allowUnfree = true;
-    nix.settings.experimental-features = [ "nix-command" "flakes" ];
+    nix.settings.experimental-features = [
+      "nix-command"
+      "flakes"
+    ];
     #nix.settings = {
     #  substituters = [
     #    "https://cache.nixos.org"
@@ -31,19 +34,15 @@
 
     users.defaultUserShell = pkgs.zsh;
 
-    programs.zsh = {
-      enable = true;
-    };
-
-environment.variables = {
-  EDITOR = "nvim";
-  VISUAL = "nvim";
-};
     services.getty.autologinUser = "zander";
     users.users.zander = {
       isNormalUser = true;
       description = "Zander";
-      extraGroups = [ "wheel" "networkmanager" "docker" ];
+      extraGroups = [
+        "wheel"
+        "networkmanager"
+        "docker"
+      ];
       shell = pkgs.zsh;
       home = "/home/zander";
     };
@@ -53,7 +52,7 @@ environment.variables = {
         exec Hyprland
       fi
     '';
-  
+
     environment.systemPackages = with pkgs; [
       neovim
       git
@@ -62,11 +61,11 @@ environment.variables = {
     ];
 
     hjem.users = {
-zander = {
-user = "zander";
-directory = "/home/zander";
-};
-};
+      zander = {
+        user = "zander";
+        directory = "/home/zander";
+      };
+    };
 
     system.stateVersion = "25.11";
   };
