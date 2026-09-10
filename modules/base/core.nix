@@ -53,7 +53,9 @@
         users = [ "zander" ];
         commands = [
           {
-            command = "/run/current-system/sw/bin/nixos-rebuild switch --flake /home/zander/nixconfig#desktop";
+            # `#` starts a comment in sudoers syntax, so it must be escaped
+            # or NOPASSWD silently only matches up to "nixconfig".
+            command = "/run/current-system/sw/bin/nixos-rebuild switch --flake /home/zander/nixconfig\\#desktop";
             options = [ "NOPASSWD" ];
           }
         ];
