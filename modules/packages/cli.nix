@@ -28,10 +28,7 @@
     };
     programs.yazi.enable = true;
     programs.nh.enable = true;
-    programs.starship = {
-      enable = true;
-      enableZshIntegration = true;
-    };
+    programs.starship.enable = true;
 
     programs.zsh = {
       enable = true;
@@ -41,18 +38,14 @@
       syntaxHighlighting.enable = true;
       # Provides enhanced tab-completion for tools like git, systemd, etc.
       enableBashCompletion = true;
-      enableFzfGit = true;
-      enableFzfHistory = true;
 
       interactiveShellInit = ''
+        eval "$(fzf --zsh)"
+        eval $(starship init zsh)
         source ${pkgs.zsh-nix-shell}/share/zsh-nix-shell/nix-shell.plugin.zsh
       '';
     };
 
-    programs.fzf = {
-      enable = true;
-      enableZshIntegration = true;
-    };
     programs.zoxide = {
       enable = true;
       enableZshIntegration = true;
