@@ -12,6 +12,7 @@
       # services
       audio
       graphics
+      tailscale
 
       # packages
       hyprland

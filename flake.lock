@@ -91,6 +91,23 @@
         "type": "github"
       }
     },
+    "kickstart-modular-nvim": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789074449,
+        "narHash": "sha256-9JoDRN8ZpNtR2Pm1OTthDn1/WFxubItyV9iOUIBw7EI=",
+        "owner": "veedo",
+        "repo": "kickstart-modular.nvim",
+        "rev": "1a28ac1af2da13545770d6e1186b5229690f158c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "veedo",
+        "ref": "zander",
+        "repo": "kickstart-modular.nvim",
+        "type": "github"
+      }
+    },
     "neovim-nightly-overlay": {
       "inputs": {
         "flake-parts": "flake-parts_2",
@@ -161,6 +178,7 @@
         "flake-parts": "flake-parts",
         "hjem": "hjem",
         "import-tree": "import-tree",
+        "kickstart-modular-nvim": "kickstart-modular-nvim",
         "neovim-nightly-overlay": "neovim-nightly-overlay",
         "nixpkgs": "nixpkgs",
         "nixpkgs-unstable": "nixpkgs-unstable",

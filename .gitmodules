@@ -1,0 +1,4 @@
+[submodule "modules/packages/nvim/kickstart-modular.nvim"]
+	path = modules/packages/nvim/kickstart-modular.nvim
+	url = git@github.com:veedo/kickstart-modular.nvim.git
+	branch = zander
