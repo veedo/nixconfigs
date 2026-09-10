@@ -16,6 +16,7 @@
       # packages
       hyprland
       core
+      nixpkgs
       cli
       noctalia
 

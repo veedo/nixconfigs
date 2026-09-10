@@ -49,6 +49,21 @@
         eval "$(fzf --zsh)"
         eval $(starship init zsh)
         source ${pkgs.zsh-nix-shell}/share/zsh-nix-shell/nix-shell.plugin.zsh
+
+        # `nixpkgs.config.allowUnfree` only applies to this system's own pkgs;
+        # ad-hoc flake refs like `nixpkgs#foo` need NIXPKGS_ALLOW_UNFREE and
+        # --impure to honor it (Nix ignores env vars during flake evaluation
+        # otherwise). Auto-add --impure for the commands that hit this.
+        nix() {
+          case "$1" in
+            shell|run|build|develop)
+              command nix "$1" --impure "''${@:2}"
+              ;;
+            *)
+              command nix "$@"
+              ;;
+          esac
+        }
       '';
     };
 

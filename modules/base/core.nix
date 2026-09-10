@@ -1,7 +1,6 @@
 {
   flake.nixosModules.core = { pkgs, ... }: {
 
-    nixpkgs.config.allowUnfree = true;
     nix.settings.experimental-features = [
       "nix-command"
       "flakes"
@@ -46,6 +45,20 @@
       shell = pkgs.zsh;
       home = "/home/zander";
     };
+
+    # Lets an agent run `sudo nixos-rebuild switch --flake /home/zander/nixconfig#desktop`
+    # unattended to test/apply changes, without handing out passwordless sudo generally.
+    security.sudo.extraRules = [
+      {
+        users = [ "zander" ];
+        commands = [
+          {
+            command = "/run/current-system/sw/bin/nixos-rebuild switch --flake /home/zander/nixconfig#desktop";
+            options = [ "NOPASSWD" ];
+          }
+        ];
+      }
+    ];
 
     environment.loginShellInit = ''
       if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
