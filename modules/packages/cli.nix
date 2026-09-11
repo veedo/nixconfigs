@@ -1,5 +1,5 @@
 {
-  flake.nixosModules.cli = { pkgs, ... }: {
+  flake.nixosModules.cli = { pkgs, lib, ... }: {
 
     environment.systemPackages = with pkgs; [
       jq
@@ -31,9 +31,17 @@
     programs.nh.enable = true;
     programs.starship = {
       enable = true;
-      settings = {
-        add_newline = false;
-      };
+      settings = lib.mkMerge [
+        (builtins.fromTOML (builtins.readFile "${pkgs.starship}/share/starship/presets/catppuccin-powerline.toml"))
+        {
+          add_newline = false;
+          # Pick your Catppuccin flavor: catppuccin_mocha, catppuccin_macchiato, catppuccin_frappe, or catppuccin_latte
+          palette = lib.mkForce "catppuccin_macchiato";
+
+          # (Optional) Add your custom prompt configurations here
+          # directory.style = "bg:peach fg:crust";
+        }
+      ];
     };
 
     programs.zsh = {
